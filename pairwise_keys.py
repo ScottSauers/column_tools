@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, ttk
 from datetime import datetime
 
 def select_file_and_column(temp_dir):
@@ -129,14 +129,14 @@ def find_similar_columns(selected_files, temp_dir, master_key_file, key_column):
                         max_similarity = similarity
                         most_similar_column = column
 
-        results.append((filename, most_similar_column, max_similarity))
+        results.append((filename, master_key_file, key_column, most_similar_column, max_similarity))
 
     return results
 
 def pairwise_heatmap_for_ids(results, temp_dir, ax, title_suffix):
     all_ids = {}
 
-    for filename, column, similarity in results:
+    for filename, key_file, key_column, column, similarity in results:
         if filename.startswith("~$"):  # Skip temporary or hidden files
             continue
         file_path = os.path.join(temp_dir, filename)
@@ -176,40 +176,42 @@ def pairwise_heatmap_for_ids(results, temp_dir, ax, title_suffix):
     ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
     ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
 
-def save_results_to_csv(results, selected_column, file_name):
+def save_results_to_csv(results, output_file):
     data = []
     for result in results:
-        file, column, _ = result
-        data.append([file, selected_column, column])
+        file, key_file, key_column, column, _ = result
+        data.append([file, key_file, key_column, column])
 
-    df = pd.DataFrame(data, columns=["File Path", "Key Column", "Matched Column"])
-    df.to_csv(file_name, index=False)
-    print(f"Results saved to {file_name}")
+    df = pd.DataFrame(data, columns=["File Path", "Key File", "Key Column", "Matched Column"])
+    df.to_csv(output_file, index=False)
+    print(f"Results saved to {output_file}")
 
 def main():
     temp_dir = "/Users/scott/Downloads/merger"
     selected_files = [f for f in os.listdir(temp_dir) if f.lower().endswith('.xlsx')]
 
-    # Prompt the user to select the file and column
+    # Prompt the user to select the first file and column
     selected_file1, selected_column1 = select_file_and_column(temp_dir)
+    
+    # Prompt the user to select the second file and column
     selected_file2, selected_column2 = select_file_and_column(temp_dir)
-
+    
     # Find similar columns in the selected files for the first selection
     results1 = find_similar_columns(selected_files, temp_dir, selected_file1, selected_column1)
-
+    
     # Print the results for the first selection
     print("Most similar columns found for the first selection:")
     for result in results1:
-        print(f"File: {result[0]}, Column: {result[1]}, Similarity: {result[2]}")
-
+        print(f"File: {result[0]}, Column: {result[3]}, Similarity: {result[4]}")
+    
     # Find similar columns in the selected files for the second selection
     results2 = find_similar_columns(selected_files, temp_dir, selected_file2, selected_column2)
-
+    
     # Print the results for the second selection
     print("\nMost similar columns found for the second selection:")
     for result in results2:
-        print(f"File: {result[0]}, Column: {result[1]}, Similarity: {result[2]}")
-
+        print(f"File: {result[0]}, Column: {result[3]}, Similarity: {result[4]}")
+    
     # Plot heatmaps side by side
     fig, axs = plt.subplots(1, 2, figsize=(30, 10))
 
@@ -223,18 +225,18 @@ def main():
     print("\nComparing maximum similarities for each file:")
     final_results = []
     for res1, res2 in zip(results1, results2):
-        file1, column1, sim1 = res1
-        file2, column2, sim2 = res2
+        file1, key_file1, key_column1, column1, sim1 = res1
+        file2, key_file2, key_column2, column2, sim2 = res2
         best_res = res1 if sim1 > sim2 else res2
-        file, column, best_sim = best_res
+        file, key_file, key_column, column, best_sim = best_res
         log_scale_sim = -np.log10(1 - best_sim)
-        print(f"File: {file}, Column: {column}, Similarity: {best_sim} (Log Scale: {log_scale_sim})")
-        final_results.append(best_res)
+        print(f"File: {file}, Key File: {key_file}, Key Column: {key_column}, Column: {column}, Similarity: {best_sim} (Log Scale: {log_scale_sim})")
+        final_results.append((file, key_file, key_column, column, best_sim))
 
-    # Save results to csv
+    # Save results to CSV
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = os.path.join(temp_dir, f"key_columns_{timestamp}.csv")
-    save_results_to_csv(final_results, selected_column1, output_file)
+    save_results_to_csv(final_results, output_file)
 
 if __name__ == "__main__":
     main()
